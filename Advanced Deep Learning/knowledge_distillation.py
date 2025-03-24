@@ -107,7 +107,7 @@ def main():
     ])
     train_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10('./data', train=True, download=True, transform=transform),
-        batch_size=128, shuffle=True
+        batch_size=256, shuffle=True
     )
     test_loader = torch.utils.data.DataLoader(
         datasets.CIFAR10('./data', train=False, transform=transform),
@@ -125,7 +125,7 @@ def main():
     # Distillation hyperparameters
     T = 5.0
     alpha = 0.7
-    epochs = 30
+    epochs = 50
 
     # Lists to track test loss and accuracy for each epoch
     epochs_list = []
