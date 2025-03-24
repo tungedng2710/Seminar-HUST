@@ -148,7 +148,7 @@ optimizers_to_try = {
     "SGD": lambda params: optim.SGD(params, lr=learning_rate),
     "Adam": lambda params: optim.Adam(params, lr=learning_rate),
     "RMSprop": lambda params: optim.RMSprop(params, lr=learning_rate),
-    # "LBFGS": lambda params: optim.LBFGS(params, lr=learning_rate, max_iter=max_iter_lbfgs)
+    "LBFGS": lambda params: optim.LBFGS(params, lr=learning_rate, max_iter=max_iter_lbfgs)
 }
 
 # Dictionary to store loss curves for each optimizer
