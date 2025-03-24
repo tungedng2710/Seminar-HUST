@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # ---------------------
 # 1. Hyperparameters
 # ---------------------
-batch_size = 128
+batch_size = 68
 learning_rate = 0.01
 epochs = 10             # Number of epochs to train
 max_iter_lbfgs = 20    # LBFGS parameter
@@ -145,10 +145,10 @@ def test_model(model, loader, device):
 # 7. Compare Multiple Optimizers
 # ---------------------
 optimizers_to_try = {
-    "SGD": lambda params: optim.SGD(params, lr=learning_rate),
-    "Adam": lambda params: optim.Adam(params, lr=learning_rate),
-    "RMSprop": lambda params: optim.RMSprop(params, lr=learning_rate),
-    "LBFGS": lambda params: optim.LBFGS(params, lr=learning_rate, max_iter=max_iter_lbfgs)
+    # "SGD": lambda params: optim.SGD(params, lr=learning_rate),
+    # "Adam": lambda params: optim.Adam(params, lr=learning_rate),
+    # "RMSprop": lambda params: optim.RMSprop(params, lr=learning_rate),
+    "LBFGS": lambda params: optim.LBFGS(params, lr=learning_rate)
 }
 
 # Dictionary to store loss curves for each optimizer
