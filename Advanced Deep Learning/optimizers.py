@@ -9,9 +9,9 @@ import matplotlib.pyplot as plt
 # ---------------------
 # 1. Hyperparameters
 # ---------------------
-batch_size = 64
+batch_size = 128
 learning_rate = 0.01
-epochs = 5             # Number of epochs to train
+epochs = 10             # Number of epochs to train
 max_iter_lbfgs = 20    # LBFGS parameter
 
 # ---------------------
@@ -188,8 +188,8 @@ plt.title("Loss Curves for Different Optimizers (MNIST)")
 plt.legend()
 
 # Save the figure to a file
-plt.savefig("loss_curves.png")
-print("\nLoss curves saved to 'loss_curves.png'.")
+plt.savefig("logs/optmiizers_loss_curves.png")
+print("\nLoss curves saved to 'logs/optmiizers_loss_curves.png'.")
 
 # ---------------------
 # 9. Print Final Results

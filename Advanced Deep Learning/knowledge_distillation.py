@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms, models
 import matplotlib.pyplot as plt
-from resnet import resnet18
+from models.resnet import resnet18
 
 # Teacher Model: ResNet-18 pre-trained on CIFAR-10
 def get_teacher_model(device):
@@ -182,8 +182,8 @@ def main():
     ax2.grid(True)
 
     plt.tight_layout()
-    plt.savefig("results.png")
-    print("Saved training curves to 'results.png'.")
+    plt.savefig("logs/kd_results.png")
+    print("Saved training curves to 'logs/kd_results.png'.")
 
 if __name__ == '__main__':
     main()

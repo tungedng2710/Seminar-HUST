@@ -173,5 +173,9 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+# Dataset and logs
 Advanced Deep Learning/data
 *.sh
+*.png
+*.jpg
+*.mp4
