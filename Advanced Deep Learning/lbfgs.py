@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 batch_size = 64
 learning_rate = 0.01
 max_iterations_per_step = 20  # Number of iterations per LBFGS step
-epochs = 1  # For demonstration, we set it to 1. Increase for better results.
+epochs = 2  # For demonstration, we set it to 1. Increase for better results.
 
 # ---------------------
 # 2. Data Preparation
@@ -66,6 +66,8 @@ class SimpleCNN(nn.Module):
         x = nn.functional.relu(self.fc1(x))
         x = self.fc2(x)
         return x
+    
+    
 
 model = SimpleCNN()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,7 +77,7 @@ model.to(device)
 # 4. Define Loss and Optimizer
 # ---------------------
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.LBFGS(model.parameters(), lr=learning_rate)
+optimizer = optim.LBFGS(model.parameters(), lr=learning_rate, max_iter=4, line_search_fn="strong_wolfe")
 
 # ---------------------
 # 5. Training Loop (Using LBFGS)

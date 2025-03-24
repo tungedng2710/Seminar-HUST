@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 # ---------------------
 # 1. Hyperparameters
 # ---------------------
-batch_size = 68
+batch_size = 256
 learning_rate = 0.01
 epochs = 10             # Number of epochs to train
 max_iter_lbfgs = 20    # LBFGS parameter
@@ -76,6 +76,22 @@ class LeNet(nn.Module):
         x = self.fc3(x)
         return self.log_softmax(x)
 
+class BatchGD:
+    def __init__(self, params, lr=0.01):
+        self.params = list(params)
+        self.lr = lr
+
+    def step(self):
+        for param in self.params:
+            if param.grad is not None:
+                param.data -= self.lr * param.grad.data
+
+    def zero_grad(self):
+        for param in self.params:
+            if param.grad is not None:
+                param.grad.zero_()
+
+
 # ---------------------
 # 4. Setup Device, Loss
 # ---------------------
@@ -106,6 +122,7 @@ def train_one_epoch(model, optimizer, loader, device):
                 loss.backward()
                 return loss
             loss = optimizer.step(closure)
+            # print(loss)
         else:
             optimizer.zero_grad()
             outputs = model(data)
@@ -145,10 +162,14 @@ def test_model(model, loader, device):
 # 7. Compare Multiple Optimizers
 # ---------------------
 optimizers_to_try = {
-    # "SGD": lambda params: optim.SGD(params, lr=learning_rate),
-    # "Adam": lambda params: optim.Adam(params, lr=learning_rate),
-    # "RMSprop": lambda params: optim.RMSprop(params, lr=learning_rate),
-    "LBFGS": lambda params: optim.LBFGS(params, lr=learning_rate)
+    "SGD": lambda params: optim.SGD(params, lr=learning_rate),
+    "Adam": lambda params: optim.Adam(params, lr=learning_rate),
+    "RMSprop": lambda params: optim.RMSprop(params, lr=learning_rate),
+    "LBFGS": lambda params: optim.LBFGS(params,
+                                        lr=learning_rate,
+                                        max_iter=6,
+                                        line_search_fn="strong_wolfe"),
+    "BatchGD": lambda params: BatchGD(params, lr=learning_rate)
 }
 
 # Dictionary to store loss curves for each optimizer
@@ -188,8 +209,8 @@ plt.title("Loss Curves for Different Optimizers (MNIST)")
 plt.legend()
 
 # Save the figure to a file
-plt.savefig("logs/optmiizers_loss_curves.png")
-print("\nLoss curves saved to 'logs/optmiizers_loss_curves.png'.")
+plt.savefig("logs/optmizers_loss_curves.png")
+print("\nLoss curves saved to 'logs/optmizers_loss_curves.png'.")
 
 # ---------------------
 # 9. Print Final Results
