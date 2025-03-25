@@ -119,13 +119,13 @@ def main():
     student_distilled = LeNet5().to(device)
     student_scratch = LeNet5().to(device)
 
-    optimizer_distilled = optim.SGD(student_distilled.parameters(), lr=0.01)
-    optimizer_scratch = optim.SGD(student_scratch.parameters(), lr=0.01)
+    optimizer_distilled = optim.Adam(student_distilled.parameters(), lr=0.001)
+    optimizer_scratch = optim.Adam(student_scratch.parameters(), lr=0.001)
 
     # Distillation hyperparameters
     T = 5.0
     alpha = 0.7
-    epochs = 50
+    epochs = 25
 
     # Lists to track test loss and accuracy for each epoch
     epochs_list = []

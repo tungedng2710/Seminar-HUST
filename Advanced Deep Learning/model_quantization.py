@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torchvision import datasets, transforms
-from models.lenet import LeNet
+import time
 
 # -------------------------
 # 1. Define a simple LeNet
@@ -11,7 +11,7 @@ from models.lenet import LeNet
 class LeNet(nn.Module):
     def __init__(self, num_classes=10):
         super(LeNet, self).__init__()
-        # A classic LeNet has 2 conv layers + 2 linear layers, but we’ll keep it simple
+        # Classic LeNet has 2 conv layers + 2 linear layers, but this is a slightly adapted version
         self.conv1 = nn.Conv2d(1, 6, kernel_size=5, padding=2)
         self.conv2 = nn.Conv2d(6, 16, kernel_size=5)
         self.fc1 = nn.Linear(16 * 5 * 5, 120)
@@ -19,7 +19,7 @@ class LeNet(nn.Module):
         self.fc3 = nn.Linear(84, num_classes)
 
     def forward(self, x):
-        # input shape: (batch, 1, 28, 28)
+        # x shape: (batch, 1, 28, 28)
         x = F.relu(self.conv1(x))       # -> (batch, 6, 28, 28)
         x = F.max_pool2d(x, 2)         # -> (batch, 6, 14, 14)
         x = F.relu(self.conv2(x))      # -> (batch, 16, 10, 10)
@@ -48,18 +48,41 @@ def train_one_epoch(model, device, train_loader, optimizer, epoch):
             print(f"Train Epoch: {epoch} [{batch_idx * len(data):5d}/{len(train_loader.dataset):5d}] "
                   f"Loss: {loss.item():.6f}")
 
-def test_model(model, device, test_loader, desc="Model"):
+def measure_inference_performance(model, device, test_loader, desc="Model", dtype=None):
+    """
+    Evaluates accuracy and measures inference time (forward pass over the entire test set).
+    Optionally casts input data to `dtype` (e.g., torch.float16 or torch.bfloat16).
+    Returns (accuracy, total_time_seconds, samples_per_second).
+    """
     model.eval()
     correct = 0
+    total_samples = len(test_loader.dataset)
+
+    # Synchronize before timing (esp. if using GPU)
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+
+    start = time.time()
     with torch.no_grad():
         for data, target in test_loader:
             data, target = data.to(device), target.to(device)
+            if dtype is not None:
+                data = data.to(dtype)
             output = model(data)
             pred = output.argmax(dim=1)
             correct += pred.eq(target).sum().item()
-    accuracy = 100.0 * correct / len(test_loader.dataset)
-    print(f"{desc} Accuracy: {accuracy:.2f}%")
-    return accuracy
+
+    # Synchronize again to ensure all kernels have finished
+    if device.type == 'cuda':
+        torch.cuda.synchronize()
+
+    end = time.time()
+    total_time = end - start
+    accuracy = 100.0 * correct / total_samples
+    samples_per_second = total_samples / total_time
+    print(f"{desc} -> Accuracy: {accuracy:.2f}%, Inference time: {total_time:.4f}s, "
+          f"Throughput: {samples_per_second:.2f} samples/s")
+    return accuracy, total_time, samples_per_second
 
 # -------------------------------
 # 3. Data loading (MNIST)
@@ -74,7 +97,7 @@ def get_mnist_loaders(batch_size=64):
     test_dataset  = datasets.MNIST(root="./data", train=False, download=True, transform=transform)
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    test_loader  = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    test_loader  = torch.utils.data.DataLoader(test_dataset,  batch_size=batch_size, shuffle=False)
     return train_loader, test_loader
 
 # -----------------------------
@@ -85,112 +108,70 @@ def main():
     print(f"Using device: {device}")
 
     # Hyperparameters
-    epochs = 10
-    batch_size = 128
+    epochs = 2
+    batch_size = 64
     lr = 0.01
 
     # Get data
     train_loader, test_loader = get_mnist_loaders(batch_size=batch_size)
 
-    # Create and train a LeNet model in FP32
+    # 4A: Create and train a LeNet model in FP32
     model_fp32 = LeNet().to(device)
     optimizer = optim.SGD(model_fp32.parameters(), lr=lr, momentum=0.9)
 
     for epoch in range(1, epochs + 1):
         train_one_epoch(model_fp32, device, train_loader, optimizer, epoch)
-        test_model(model_fp32, device, test_loader, desc=f"FP32 (Epoch {epoch})")
+        measure_inference_performance(model_fp32, device, test_loader, desc=f"[FP32, Epoch {epoch}]")
 
     print("Final FP32 evaluation on test set:")
-    baseline_acc = test_model(model_fp32, device, test_loader, desc="FP32")
+    baseline_acc, _, _ = measure_inference_performance(model_fp32, device, test_loader, desc="[FP32 baseline]")
 
-    # -------------------------------------
-    # 5A. Convert to FP16 (for inference)
-    # -------------------------------------
-    # We'll create a copy of the model and convert it. 
-    # On CPU, this may have limited support. On GPU, this is more typical.
+    # ------------------------------------------------------
+    # 4B. Convert to FP16 for inference (on GPU typically)
+    # ------------------------------------------------------
     model_fp16 = LeNet().to(device)
     model_fp16.load_state_dict(model_fp32.state_dict())  # copy weights
-    model_fp16 = model_fp16.half()                       # cast to half
-    # Evaluate
-    # Note: For correct FP16 inference, also cast inputs to half in the test loop.
-    def test_model_fp16(model, device, test_loader, desc="Model FP16"):
-        model.eval()
-        correct = 0
-        with torch.no_grad():
-            for data, target in test_loader:
-                # Cast input to half
-                data, target = data.to(device), target.to(device)
-                data = data.half()
-                output = model(data)
-                pred = output.argmax(dim=1)
-                correct += pred.eq(target).sum().item()
-        accuracy = 100.0 * correct / len(test_loader.dataset)
-        print(f"{desc} Accuracy: {accuracy:.2f}%")
-        return accuracy
+    model_fp16.half()  # cast all parameters to half
 
-    fp16_acc = test_model_fp16(model_fp16, device, test_loader, desc="FP16 Inference")
+    # Evaluate (with input data cast to half)
+    fp16_acc, _, _ = measure_inference_performance(model_fp16, device, test_loader,
+                                                   desc="[FP16 inference]",
+                                                   dtype=torch.float16)
 
-    # -------------------------------------
-    # 5B. Convert to BF16 (for inference)
-    # -------------------------------------
-    # PyTorch allows .bfloat16() similarly.
-    # On CPU, BF16 might still have limited support. On GPU (esp. newer versions), it can be faster.
+    # ------------------------------------------------------
+    # 4C. Convert to BF16 for inference
+    # ------------------------------------------------------
     model_bf16 = LeNet().to(device)
     model_bf16.load_state_dict(model_fp32.state_dict())
     model_bf16 = model_bf16.to(torch.bfloat16)
 
-    def test_model_bf16(model, device, test_loader, desc="Model BF16"):
-        model.eval()
-        correct = 0
-        with torch.no_grad():
-            for data, target in test_loader:
-                data, target = data.to(device), target.to(device)
-                data = data.to(torch.bfloat16)
-                output = model(data)
-                pred = output.argmax(dim=1)
-                correct += pred.eq(target).sum().item()
-        accuracy = 100.0 * correct / len(test_loader.dataset)
-        print(f"{desc} Accuracy: {accuracy:.2f}%")
-        return accuracy
+    bf16_acc, _, _ = measure_inference_performance(model_bf16, device, test_loader,
+                                                   desc="[BF16 inference]",
+                                                   dtype=torch.bfloat16)
 
-    bf16_acc = test_model_bf16(model_bf16, device, test_loader, desc="BF16 Inference")
-
-    # -------------------------------------
-    # 5C. Dynamic Quantization (INT8)
-    # -------------------------------------
-    # In dynamic quantization, we typically quantize linear layers and LSTM layers.
-    # For LeNet, let's quantize the linear layers to int8. 
-    # (Conv layers aren't dynamically quantized in PyTorch.)
-    # Make a copy from the trained FP32 model:
+    # ------------------------------------------------------
+    # 4D. Dynamic Quantization (INT8) on CPU
+    # ------------------------------------------------------
+    # We'll move the original FP32 model to CPU and quantize its linear layers.
+    # Convolutions are not dynamically quantized in PyTorch.
     model_int8 = LeNet()
     model_int8.load_state_dict(model_fp32.state_dict())
     model_int8.eval()
+    # model_int8.cpu()
 
-    # We'll move it to CPU for dynamic quantization (it only works on CPU).
-    model_int8.cpu()
-    # We specify which layers to quantize (here, all Linear layers).
+    # We specify which layers to quantize; here we use {nn.Linear}
     model_int8_q = torch.quantization.quantize_dynamic(
         model_int8, {nn.Linear}, dtype=torch.qint8
     )
 
-    # Evaluate int8 model on CPU
-    def test_model_int8(model, test_loader, desc="Model INT8"):
-        model.eval()
-        correct = 0
-        with torch.no_grad():
-            for data, target in test_loader:
-                data, target = data.cpu(), target.cpu()
-                output = model(data)
-                pred = output.argmax(dim=1)
-                correct += pred.eq(target).sum().item()
-        accuracy = 100.0 * correct / len(test_loader.dataset)
-        print(f"{desc} Accuracy: {accuracy:.2f}%")
-        return accuracy
-
-    int8_acc = test_model_int8(model_int8_q, test_loader, desc="INT8 Dynamic Quantization")
+    # Evaluate on CPU
+    device_cpu = torch.device("cpu")  # dynamic quant only works on CPU
+    device_gpu = torch.device("cuda")
+    int8_acc, _, _ = measure_inference_performance(model_int8_q, device_gpu, test_loader,
+                                                   desc="[INT8 dynamic quant]")
 
     # ------------------------
-    # 6. Compare accuracies
+    # 5. Compare accuracies
     # ------------------------
     print("\n--- Accuracy Summary ---")
     print(f"FP32: {baseline_acc:.2f}%")
