@@ -167,7 +167,7 @@ def main():
     # Evaluate on CPU
     device_cpu = torch.device("cpu")  # dynamic quant only works on CPU
     device_gpu = torch.device("cuda")
-    int8_acc, _, _ = measure_inference_performance(model_int8_q, device_gpu, test_loader,
+    int8_acc, _, _ = measure_inference_performance(model_int8_q, device, test_loader,
                                                    desc="[INT8 dynamic quant]")
 
     # ------------------------
