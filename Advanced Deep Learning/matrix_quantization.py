@@ -50,7 +50,7 @@ res_bf16, time_bf16 = test_matmul(x_fp32, y_fp32, torch.bfloat16, device)
 err_bf16 = (res_fp32 - res_bf16.float()).abs().mean().item()
 print(f"[BF16 ] time: {time_bf16:.6f} s | mean abs diff vs FP32: {err_bf16}")
 
-# INT8 (naively cast to int8, then multiply in float)
+# INT8 (naively cast to int8, then multiply in float)openmmlab
 res_int8, time_int8 = test_matmul(x_fp32, y_fp32, torch.int8, device)
 err_int8 = (res_fp32 - res_int8).abs().mean().item()
 print(f"[INT8 ] time: {time_int8:.6f} s | mean abs diff vs FP32: {err_int8}")
